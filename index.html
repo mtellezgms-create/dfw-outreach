@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DFW Outreach Dashboard</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --blue: #4f8ef7;
+    --blue-dim: #1e3a6e;
+    --green: #22c55e;
+    --green-dim: #14532d;
+    --orange: #f97316;
+    --orange-dim: #431407;
+    --red: #ef4444;
+    --red-dim: #450a0a;
+    --purple: #a855f7;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; }
+
+  /* Layout */
+  .app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+  .sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 20px 0; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; }
+  .sidebar-logo { padding: 0 20px 24px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .sidebar-logo h1 { font-size: 16px; font-weight: 700; color: var(--blue); }
+  .sidebar-logo span { font-size: 11px; color: var(--muted); }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; cursor: pointer; color: var(--muted); transition: all .15s; border-left: 3px solid transparent; font-size: 13px; }
+  .nav-item:hover { color: var(--text); background: var(--surface2); }
+  .nav-item.active { color: var(--blue); border-left-color: var(--blue); background: var(--blue-dim); }
+  .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .nav-section { padding: 12px 20px 4px; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-top: 8px; }
+  .api-status { margin-top: auto; padding: 16px 20px; border-top: 1px solid var(--border); }
+  .api-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); display: inline-block; margin-right: 6px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  .main { padding: 28px; overflow-y: auto; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .page-header { margin-bottom: 24px; }
+  .page-header h2 { font-size: 22px; font-weight: 700; }
+  .page-header p { color: var(--muted); margin-top: 4px; font-size: 13px; }
+
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+  .card-sm { padding: 14px 18px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+  .stat-value { font-size: 28px; font-weight: 700; }
+  .stat-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .stat-blue { color: var(--blue); }
+  .stat-green { color: var(--green); }
+  .stat-orange { color: var(--orange); }
+  .stat-purple { color: var(--purple); }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 7px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; transition: all .15s; }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #3b7de8; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: var(--border); }
+  .btn-success { background: var(--green); color: #000; }
+  .btn-success:hover { background: #16a34a; }
+  .btn-danger { background: var(--red-dim); color: var(--red); border: 1px solid var(--red); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* Forms */
+  .form-row { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 160px; }
+  .form-group label { font-size: 12px; color: var(--muted); }
+  input, select, textarea { background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 7px; padding: 8px 12px; font-size: 13px; width: 100%; outline: none; font-family: inherit; }
+  input:focus, select:focus, textarea:focus { border-color: var(--blue); }
+  textarea { resize: vertical; min-height: 100px; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; padding: 10px 14px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+
+  /* Badges */
+  .badge { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .badge-new { background: var(--blue-dim); color: var(--blue); }
+  .badge-email1 { background: #1e3a5f; color: #60a5fa; }
+  .badge-email2 { background: #2e1b5a; color: var(--purple); }
+  .badge-email3 { background: #431407; color: var(--orange); }
+  .badge-replied { background: var(--green-dim); color: var(--green); }
+  .badge-call { background: #1a2e1a; color: #86efac; }
+  .badge-closed { background: #14532d; color: #4ade80; }
+  .badge-dead { background: #1c1c1c; color: #6b7280; }
+  .badge-hvac { background: #1e3a6e; color: #93c5fd; }
+  .badge-roofing { background: #431407; color: #fdba74; }
+
+  /* Email modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); width: 680px; max-width: 95vw; max-height: 90vh; overflow-y: auto; }
+  .modal-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .modal-header h3 { font-size: 16px; font-weight: 700; }
+  .modal-body { padding: 20px 24px; }
+  .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+  .close-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 20px; line-height: 1; }
+  .close-btn:hover { color: var(--text); }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; background: var(--surface2); border-radius: 8px; padding: 4px; margin-bottom: 20px; }
+  .tab { padding: 7px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--muted); transition: all .15s; border: none; background: none; }
+  .tab.active { background: var(--surface); color: var(--text); font-weight: 600; }
+
+  /* Email preview */
+  .email-preview { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; color: var(--text); }
+  .email-field { margin-bottom: 12px; }
+  .email-field label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+
+  /* Pipeline kanban */
+  .kanban { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; overflow-x: auto; padding-bottom: 8px; }
+  .kanban-col { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; min-width: 160px; }
+  .kanban-col-header { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+  .kanban-count { background: var(--surface2); border-radius: 10px; padding: 2px 7px; font-size: 10px; }
+  .kanban-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; padding: 10px; margin-bottom: 8px; font-size: 12px; cursor: pointer; }
+  .kanban-card:hover { border-color: var(--blue); }
+  .kanban-card .company { font-weight: 600; margin-bottom: 3px; }
+  .kanban-card .contact { color: var(--muted); }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 18px; font-size: 13px; z-index: 200; display: none; box-shadow: 0 4px 24px rgba(0,0,0,.4); }
+  .toast.show { display: flex; align-items: center; gap: 10px; }
+  .toast.success { border-color: var(--green); }
+  .toast.error { border-color: var(--red); }
+
+  /* Misc */
+  .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .section-title { font-size: 15px; font-weight: 700; }
+  .empty { text-align: center; padding: 40px; color: var(--muted); }
+  .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin .7s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .tag { display: inline-block; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 2px 7px; font-size: 11px; color: var(--muted); margin-right: 4px; }
+  .confidence { display: inline-block; width: 36px; height: 4px; background: var(--border); border-radius: 2px; position: relative; vertical-align: middle; }
+  .confidence-bar { height: 100%; border-radius: 2px; background: var(--green); }
+  .flex-gap { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .text-muted { color: var(--muted); }
+  .text-sm { font-size: 12px; }
+  .mb-16 { margin-bottom: 16px; }
+  .mb-8 { margin-bottom: 8px; }
+  .settings-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .settings-row:last-child { border-bottom: none; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <h1>⚡ DFW Outreach</h1>
+      <span>HVAC & Roofing Pipeline</span>
+    </div>
+    <div class="nav-section">Main</div>
+    <div class="nav-item active" onclick="showPage('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item" onclick="showPage('search')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      Find Leads (Hunter.io)
+    </div>
+    <div class="nav-item" onclick="showPage('pipeline')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      Pipeline
+    </div>
+    <div class="nav-item" onclick="showPage('emails')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+      Email Templates
+    </div>
+    <div class="nav-section">Tools</div>
+    <div class="nav-item" onclick="showPage('leads')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      All Leads
+    </div>
+    <div class="nav-item" onclick="showPage('settings')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M20 12h2M2 12h2M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41"/></svg>
+      Settings
+    </div>
+    <div class="api-status">
+      <div class="text-sm"><span class="api-status-dot" id="apiDot"></span><span id="apiStatusText">Checking API...</span></div>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <h2>Dashboard</h2>
+        <p>Your DFW HVAC & Roofing outreach at a glance</p>
+      </div>
+      <div class="grid-4">
+        <div class="card card-sm">
+          <div class="stat-label">Total Leads</div>
+          <div class="stat-value stat-blue" id="stat-total">0</div>
+          <div class="stat-sub">contacts tracked</div>
+        </div>
+        <div class="card card-sm">
+          <div class="stat-label">Emails Sent</div>
+          <div class="stat-value stat-purple" id="stat-sent">0</div>
+          <div class="stat-sub">across all sequences</div>
+        </div>
+        <div class="card card-sm">
+          <div class="stat-label">Replies</div>
+          <div class="stat-value stat-green" id="stat-replied">0</div>
+          <div class="stat-sub" id="stat-reply-rate">0% reply rate</div>
+        </div>
+        <div class="card card-sm">
+          <div class="stat-label">Calls Booked</div>
+          <div class="stat-value stat-orange" id="stat-calls">0</div>
+          <div class="stat-sub">discovery calls</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="section-header">
+            <div class="section-title">📋 This Week's Actions</div>
+          </div>
+          <div id="weekly-actions">
+            <div class="text-muted text-sm">Loading action items...</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-header">
+            <div class="section-title">🎯 Outreach Math</div>
+          </div>
+          <table>
+            <tr><td>Emails sent</td><td style="text-align:right;color:var(--blue)" id="math-sent">0</td></tr>
+            <tr><td>Replies (5–10%)</td><td style="text-align:right;color:var(--purple)" id="math-replies">0</td></tr>
+            <tr><td>Calls booked (50%)</td><td style="text-align:right;color:var(--orange)" id="math-calls">0</td></tr>
+            <tr><td>Projected clients (40%)</td><td style="text-align:right;color:var(--green)" id="math-clients">0</td></tr>
+            <tr><td><strong>Projected revenue</strong></td><td style="text-align:right;color:var(--green);font-weight:700" id="math-revenue">$0</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-header">
+          <div class="section-title">🕐 Recent Activity</div>
+        </div>
+        <div id="recent-activity">
+          <div class="empty">No activity yet. Start by finding leads! →</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEARCH / HUNTER -->
+    <div class="page" id="page-search">
+      <div class="page-header">
+        <h2>Find DFW Leads</h2>
+        <p>Search Hunter.io for HVAC & Roofing companies in Dallas-Fort Worth</p>
+      </div>
+
+      <div class="card mb-16">
+        <div class="section-title mb-16">🔍 Search Parameters</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Niche</label>
+            <select id="search-niche">
+              <option value="hvac">HVAC (Heating, Ventilation & Air Conditioning)</option>
+              <option value="roofing">Roofing Contractors</option>
+              <option value="both">Both Niches</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>City</label>
+            <select id="search-city">
+              <option value="Dallas">Dallas, TX</option>
+              <option value="Fort Worth">Fort Worth, TX</option>
+              <option value="Arlington">Arlington, TX</option>
+              <option value="Plano">Plano, TX</option>
+              <option value="Irving">Irving, TX</option>
+              <option value="Garland">Garland, TX</option>
+              <option value="Frisco">Frisco, TX</option>
+              <option value="McKinney">McKinney, TX</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Company Size</label>
+            <select id="search-size">
+              <option value="1-10">1–10 employees</option>
+              <option value="11-50" selected>11–50 employees</option>
+              <option value="51-200">51–200 employees</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="searchHunter()" id="search-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          Search Hunter.io
+        </button>
+        <span id="search-status" style="margin-left:12px;color:var(--muted);font-size:12px"></span>
+      </div>
+
+      <div class="card" id="search-results-card" style="display:none">
+        <div class="section-header">
+          <div class="section-title">Results <span id="results-count" style="color:var(--muted);font-weight:400;font-size:13px"></span></div>
+          <button class="btn btn-success btn-sm" onclick="addAllToLeads()">+ Add All to Pipeline</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Company</th>
+                <th>Domain</th>
+                <th>Industry</th>
+                <th>Size</th>
+                <th>Location</th>
+                <th>Emails Found</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="search-results-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Domain email search -->
+      <div class="card" style="margin-top:16px">
+        <div class="section-title mb-16">📧 Find Emails for a Specific Domain</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Domain (e.g. acmeair.com)</label>
+            <input type="text" id="domain-input" placeholder="company-domain.com">
+          </div>
+          <div class="form-group">
+            <label>Company Name (optional)</label>
+            <input type="text" id="domain-company-name" placeholder="Acme HVAC Services">
+          </div>
+        </div>
+        <button class="btn btn-secondary" onclick="searchDomain()">Find Emails</button>
+        <div id="domain-results" style="margin-top:16px"></div>
+      </div>
+    </div>
+
+    <!-- PIPELINE -->
+    <div class="page" id="page-pipeline">
+      <div class="page-header">
+        <h2>Pipeline</h2>
+        <p>Track every lead through your outreach sequence</p>
+      </div>
+      <div class="kanban" id="kanban-board"></div>
+    </div>
+
+    <!-- EMAIL TEMPLATES -->
+    <div class="page" id="page-emails">
+      <div class="page-header">
+        <h2>Email Templates</h2>
+        <p>Pre-built sequences for HVAC and Roofing — personalize and copy</p>
+      </div>
+      <div class="tabs">
+        <button class="tab active" onclick="switchEmailTab('hvac', this)">🏢 HVAC Sequence</button>
+        <button class="tab" onclick="switchEmailTab('roofing', this)">🏠 Roofing Sequence</button>
+        <button class="tab" onclick="switchEmailTab('linkedin', this)">💼 LinkedIn Messages</button>
+      </div>
+      <div id="email-content"></div>
+    </div>
+
+    <!-- ALL LEADS -->
+    <div class="page" id="page-leads">
+      <div class="page-header">
+        <h2>All Leads</h2>
+        <p>Every contact in your pipeline</p>
+      </div>
+      <div class="flex-gap mb-16">
+        <input type="text" id="leads-search" placeholder="Search by name, company, email..." style="max-width:300px" oninput="renderLeadsTable()">
+        <select id="leads-filter-niche" onchange="renderLeadsTable()" style="max-width:160px">
+          <option value="">All Niches</option>
+          <option value="hvac">HVAC</option>
+          <option value="roofing">Roofing</option>
+        </select>
+        <select id="leads-filter-status" onchange="renderLeadsTable()" style="max-width:180px">
+          <option value="">All Statuses</option>
+          <option value="new">New</option>
+          <option value="email1">Email 1 Sent</option>
+          <option value="email2">Email 2 Sent</option>
+          <option value="email3">Email 3 Sent</option>
+          <option value="replied">Replied</option>
+          <option value="call">Call Booked</option>
+          <option value="closed">Closed</option>
+          <option value="dead">Dead</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="exportCSV()">⬇ Export CSV</button>
+        <button class="btn btn-primary btn-sm" onclick="openAddLead()">+ Add Lead</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Company</th>
+                <th>Email</th>
+                <th>Niche</th>
+                <th>Status</th>
+                <th>City</th>
+                <th>Added</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="leads-table-body"></tbody>
+          </table>
+        </div>
+        <div id="leads-empty" class="empty" style="display:none">No leads yet. Use Find Leads to get started.</div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="page" id="page-settings">
+      <div class="page-header">
+        <h2>Settings</h2>
+        <p>Configure your API key and preferences</p>
+      </div>
+      <div class="card" style="max-width:600px">
+        <div class="section-title mb-16">🔑 Hunter.io API Key</div>
+        <div class="form-group mb-16">
+          <label>API Key</label>
+          <input type="password" id="settings-api-key" placeholder="Paste your Hunter.io API key">
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()">Save & Test Connection</button>
+        <div id="settings-status" style="margin-top:12px;font-size:13px"></div>
+        <hr>
+        <div class="section-title mb-16">👤 Your Info (used in email templates)</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Your Name</label>
+            <input type="text" id="settings-name" placeholder="Marvin Tellez">
+          </div>
+          <div class="form-group">
+            <label>Your Email</label>
+            <input type="text" id="settings-email" placeholder="mtellezgms@gmail.com">
+          </div>
+        </div>
+        <div class="form-group mb-16">
+          <label>Calendar Link (for CTA in emails)</label>
+          <input type="text" id="settings-calendar" placeholder="https://calendly.com/yourlink">
+        </div>
+        <button class="btn btn-secondary" onclick="saveUserInfo()">Save Info</button>
+        <hr>
+        <div class="section-title mb-16">🗑 Data</div>
+        <div class="settings-row">
+          <div>
+            <div style="font-weight:600">Clear All Leads</div>
+            <div class="text-muted text-sm">Remove all leads from your pipeline</div>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="clearAllLeads()">Clear Leads</button>
+        </div>
+        <div class="settings-row">
+          <div>
+            <div style="font-weight:600">Export All Data</div>
+            <div class="text-muted text-sm">Download your leads as CSV</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="exportCSV()">Export CSV</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Email Draft Modal -->
+<div class="modal-overlay" id="email-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">Draft Email</h3>
+      <button class="close-btn" onclick="closeModal('email-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="email-field">
+        <label>TO</label>
+        <input type="text" id="modal-to" readonly style="background:var(--bg)">
+      </div>
+      <div class="email-field">
+        <label>SUBJECT</label>
+        <input type="text" id="modal-subject">
+      </div>
+      <div class="email-field">
+        <label>BODY</label>
+        <textarea id="modal-body-text" rows="12"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('email-modal')">Cancel</button>
+      <button class="btn btn-secondary" onclick="copyEmail()">📋 Copy Email</button>
+      <button class="btn btn-primary" onclick="openMailto()">📧 Open in Mail App</button>
+      <button class="btn btn-success" onclick="markEmailSent()">✓ Mark as Sent</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Lead Modal -->
+<div class="modal-overlay" id="add-lead-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Add Lead Manually</h3>
+      <button class="close-btn" onclick="closeModal('add-lead-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>First Name</label>
+          <input type="text" id="al-first" placeholder="John">
+        </div>
+        <div class="form-group">
+          <label>Last Name</label>
+          <input type="text" id="al-last" placeholder="Smith">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Company</label>
+          <input type="text" id="al-company" placeholder="Acme HVAC Services">
+        </div>
+        <div class="form-group">
+          <label>Niche</label>
+          <select id="al-niche">
+            <option value="hvac">HVAC</option>
+            <option value="roofing">Roofing</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="al-email" placeholder="john@acmehvac.com">
+        </div>
+        <div class="form-group">
+          <label>City</label>
+          <input type="text" id="al-city" placeholder="Dallas">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('add-lead-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveManualLead()">Add to Pipeline</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── STATE ────────────────────────────────────────────────────────────────────
+const HUNTER_API_KEY = '1f58f606f7ccd394c259ed9d6d0ae86602ab0238';
+const PROXY = 'https://api.allorigins.win/get?url=';
+
+let state = {
+  leads: [],
+  searchResults: [],
+  activity: [],
+  settings: {
+    apiKey: HUNTER_API_KEY,
+    name: 'Marvin',
+    email: 'mtellezgms@gmail.com',
+    calendar: ''
+  },
+  currentEmailLead: null,
+  currentEmailType: null
+};
+
+// ─── PERSISTENCE ─────────────────────────────────────────────────────────────
+function save() {
+  try { localStorage.setItem('dfw_state', JSON.stringify(state)); } catch(e) {}
+}
+function load() {
+  try {
+    const s = localStorage.getItem('dfw_state');
+    if (s) { const parsed = JSON.parse(s); state = { ...state, ...parsed }; }
+  } catch(e) {}
+}
+
+// ─── NAVIGATION ──────────────────────────────────────────────────────────────
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if (n.getAttribute('onclick') && n.getAttribute('onclick').includes("'" + id + "'")) n.classList.add('active');
+  });
+  if (id === 'dashboard') renderDashboard();
+  if (id === 'pipeline') renderKanban();
+  if (id === 'leads') renderLeadsTable();
+  if (id === 'emails') renderEmailTemplates('hvac');
+  if (id === 'settings') loadSettings();
+}
+
+// ─── TEMPLATES ────────────────────────────────────────────────────────────────
+const TEMPLATES = {
+  hvac: {
+    email1: {
+      subject: 'Managing PM contracts in spreadsheets?',
+      body: (lead, settings) => `Hi ${lead.firstName || '[Name]'},
+
+Noticed ${lead.company} handles commercial HVAC service in ${lead.city || 'Dallas-Fort Worth'}.
+
+Most HVAC companies I work with lose $10K–20K/year from missed PM appointments and delayed invoicing — it's usually just a tracking problem.
+
+I build custom software for HVAC companies that automates PM scheduling, dispatching, and invoice generation from completed work orders.
+
+Worth a 15-min call to see if it makes sense for ${lead.company}?
+
+${settings.name}
+${settings.calendar || '[Calendar Link]'}`
+    },
+    email2: {
+      subject: 'Re: Managing PM contracts in spreadsheets?',
+      body: (lead, settings) => `Hi ${lead.firstName || '[Name]'},
+
+Following up quickly — curious how you currently track which buildings are due for PM service each month.
+
+If it's still spreadsheets or whiteboards, that's exactly what I'd fix.
+
+Still worth a quick call?
+
+${settings.name}`
+    },
+    email3: {
+      subject: 'Last note — HVAC dispatch software',
+      body: (lead, settings) => `Hi ${lead.firstName || '[Name]'},
+
+Last note from me. If dispatch chaos and missed PM appointments aren't a priority right now, no worries.
+
+But if they are — happy to show you what I built for a similar HVAC company. Saved them 15 hours/week.
+
+${settings.calendar || '[Calendar Link]'}
+
+${settings.name}`
+    }
+  },
+  roofing: {
+    email1: {
+      subject: 'How many roofing leads go cold before follow-up?',
+      body: (lead, settings) => `Hi ${lead.firstName || '[Name]'},
+
+I work with roofing contractors in DFW to fix leaky sales pipelines.
+
+Most roofers I talk to lose 3–5 jobs/month simply because follow-up falls through the cracks — at $10K–20K/job, that's real money.
+
+I build custom CRM + estimate tools specifically for roofing companies. No $400/month SaaS — you own it outright.
+
+Worth 15 minutes to see if it fits ${lead.company}?
+
+${settings.name}
+${settings.calendar || '[Calendar Link]'}`
+    },
+    email2: {
+      subject: 'Re: How many roofing leads go cold before follow-up?',
+      body: (lead, settings) => `Hi ${lead.firstName || '[Name]'},
+
+Quick follow-up — curious what you're currently using to track leads and make sure someone follows up after every estimate.
+
+If it's a mix of texts, spreadsheets, and memory — that's exactly what I'd solve.
+
+${settings.name}`
+    },
+    email3: {
+      subject: 'Last note — roofing sales pipeline',
+      body: (lead, settings) => `Hi ${lead.firstName || '[Name]'},
+
+Last email from me. If pipeline tracking isn't a pain point right now, totally understand.
+
+But if closing 2–3 more jobs/month sounds interesting, I'd love to show you what I built for a similar contractor.
+
+${settings.calendar || '[Calendar Link]'}
+
+${settings.name}`
+    }
+  }
+};
+
+const LINKEDIN_TEMPLATES = {
+  hvac: {
+    connect: (lead) => `Hi ${lead.firstName || '[Name]'} — I build software for commercial HVAC companies. Saw ${lead.company} operates in ${lead.city || 'DFW'} and thought it worth connecting.`,
+    followup: (lead) => `Thanks for connecting! Quick question — how do you currently track which buildings are due for PM service each month? Most HVAC owners I talk to are still doing it in Excel and losing appointments.`,
+    last: (lead) => `Just wanted to share — I recently built a PM scheduling + dispatch system for a DFW HVAC company. Saved them 15 hrs/week. Happy to show you a demo if that's useful.`
+  },
+  roofing: {
+    connect: (lead) => `Hi ${lead.firstName || '[Name]'} — I build software tools for roofing contractors. Noticed ${lead.company} operates in ${lead.city || 'DFW'} and thought it might be worth connecting.`,
+    followup: (lead) => `Thanks for connecting! Quick question — how do you currently handle follow-up after sending an estimate? Most roofers I talk to lose jobs just from slow follow-up, not the bid itself.`,
+    last: (lead) => `Worth sharing — I recently built a lead tracking + weather-aware scheduling tool for a DFW roofing contractor. They closed 4 extra jobs in the first month from better follow-up alone. Happy to show you if useful.`
+  }
+};
+
+// ─── STATUS CONFIG ────────────────────────────────────────────────────────────
+const STATUSES = {
+  new: { label: 'New', badge: 'badge-new', col: 'New' },
+  email1: { label: 'Email 1 Sent', badge: 'badge-email1', col: 'Email 1' },
+  email2: { label: 'Email 2 Sent', badge: 'badge-email2', col: 'Email 2' },
+  email3: { label: 'Email 3 Sent', badge: 'badge-email3', col: 'Email 3' },
+  replied: { label: 'Replied', badge: 'badge-replied', col: 'Replied' },
+  call: { label: 'Call Booked', badge: 'badge-call', col: 'Call Booked' },
+  closed: { label: 'Closed', badge: 'badge-closed', col: 'Closed' },
+  dead: { label: 'Dead', badge: 'badge-dead', col: 'Dead' }
+};
+
+// ─── HUNTER.IO API ────────────────────────────────────────────────────────────
+async function hunterRequest(endpoint, params = {}) {
+  const key = state.settings.apiKey || HUNTER_API_KEY;
+  const url = new URL(`https://api.hunter.io/v2/${endpoint}`);
+  url.searchParams.set('api_key', key);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  // Use allorigins proxy to avoid CORS on GitHub Pages
+  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url.toString())}`;
+  const res = await fetch(proxyUrl);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const wrapper = await res.json();
+  return JSON.parse(wrapper.contents);
+}
+
+async function checkApiStatus() {
+  try {
+    const data = await hunterRequest('account');
+    if (data.data) {
+      document.getElementById('apiDot').style.background = 'var(--green)';
+      document.getElementById('apiStatusText').textContent = `Connected (${data.data.requests?.searches?.used || 0} searches used)`;
+    }
+  } catch(e) {
+    document.getElementById('apiDot').style.background = 'var(--red)';
+    document.getElementById('apiStatusText').textContent = 'API Error — check settings';
+  }
+}
+
+const NICHE_QUERIES = {
+  hvac: 'HVAC heating air conditioning service contractor',
+  roofing: 'roofing contractor roofing company',
+  both: 'HVAC roofing contractor'
+};
+
+async function searchHunter() {
+  const niche = document.getElementById('search-niche').value;
+  const city = document.getElementById('search-city').value;
+  const size = document.getElementById('search-size').value;
+  const btn = document.getElementById('search-btn');
+  const status = document.getElementById('search-status');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Searching...';
+  status.textContent = '';
+
+  try {
+    const query = `${NICHE_QUERIES[niche]} in ${city}, Texas`;
+    const data = await hunterRequest('discover', {
+      query,
+      'headquarters_location[include][0][city]': city,
+      'headquarters_location[include][0][country]': 'US',
+      'headquarters_location[include][0][state]': 'TX',
+      [`headcount[0]`]: size,
+      limit: 50
+    });
+
+    const companies = data.data || [];
+    state.searchResults = companies;
+    renderSearchResults(companies, niche, city);
+    status.textContent = `Found ${companies.length} companies`;
+    document.getElementById('search-results-card').style.display = 'block';
+    logActivity(`Searched Hunter.io: "${query}" — ${companies.length} results`);
+  } catch(e) {
+    // Fallback: try simpler query
+    try {
+      const data2 = await hunterRequest('discover', { query: NICHE_QUERIES[niche] + ' Texas', limit: 20 });
+      const companies = data2.data || [];
+      state.searchResults = companies;
+      renderSearchResults(companies, niche, city);
+      status.textContent = `Found ${companies.length} companies (broad search)`;
+      document.getElementById('search-results-card').style.display = 'block';
+    } catch(e2) {
+      status.textContent = `Error: ${e2.message}. Check your API key in Settings.`;
+      showToast('Search failed — check API key in Settings', 'error');
+    }
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> Search Hunter.io';
+}
+
+function renderSearchResults(companies, niche, city) {
+  const tbody = document.getElementById('search-results-body');
+  document.getElementById('results-count').textContent = `(${companies.length} companies)`;
+  if (!companies.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">No results found. Try a different city or niche.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = companies.map((c, i) => `
+    <tr>
+      <td><strong>${c.organization || c.name || '—'}</strong></td>
+      <td><a href="https://${c.domain}" target="_blank" style="color:var(--blue)">${c.domain || '—'}</a></td>
+      <td><span class="tag">${c.industry || 'Unknown'}</span></td>
+      <td class="text-muted">${c.headcount || '—'}</td>
+      <td class="text-muted">${c.location || city + ', TX'}</td>
+      <td>
+        <span style="color:var(--${(c.emails_count?.total||0)>0?'green':'muted'})">${c.emails_count?.total || 0} emails</span>
+      </td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-sm" onclick="fetchDomainEmails('${c.domain}','${(c.organization||c.name||'').replace(/'/g,"\\'")}','${niche}','${city}')">Get Emails</button>
+        <button class="btn btn-primary btn-sm" onclick="addCompanyToLeads(${i},'${niche}','${city}')">+ Add</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function fetchDomainEmails(domain, company, niche, city) {
+  if (!domain) return;
+  showToast(`Fetching emails for ${domain}...`);
+  try {
+    const data = await hunterRequest('domain-search', { domain, limit: 10 });
+    const emails = data.data?.emails || [];
+    if (!emails.length) { showToast('No emails found for this domain', 'error'); return; }
+    emails.forEach(em => {
+      const lead = {
+        id: Date.now() + Math.random(),
+        firstName: em.first_name || '',
+        lastName: em.last_name || '',
+        email: em.value,
+        company: company || domain,
+        domain,
+        niche: niche || 'hvac',
+        city: city || 'Dallas',
+        status: 'new',
+        confidence: em.confidence || 0,
+        position: em.position || '',
+        addedAt: new Date().toLocaleDateString()
+      };
+      if (!state.leads.find(l => l.email === lead.email)) state.leads.push(lead);
+    });
+    save();
+    showToast(`Added ${emails.length} contacts from ${domain}`, 'success');
+    logActivity(`Fetched ${emails.length} emails from ${domain}`);
+  } catch(e) {
+    showToast('Failed to fetch emails: ' + e.message, 'error');
+  }
+}
+
+async function searchDomain() {
+  const domain = document.getElementById('domain-input').value.trim().replace(/https?:\/\//,'').replace(/\/.*/,'');
+  const company = document.getElementById('domain-company-name').value.trim();
+  if (!domain) { showToast('Enter a domain first', 'error'); return; }
+  const container = document.getElementById('domain-results');
+  container.innerHTML = '<span class="spinner"></span> Searching...';
+  try {
+    const data = await hunterRequest('domain-search', { domain, limit: 10 });
+    const emails = data.data?.emails || [];
+    if (!emails.length) { container.innerHTML = '<span style="color:var(--muted)">No emails found for this domain.</span>'; return; }
+    container.innerHTML = `
+      <div style="margin-bottom:10px;color:var(--muted);font-size:12px">${emails.length} email(s) found for ${domain}</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Name</th><th>Email</th><th>Position</th><th>Confidence</th><th>Action</th></tr></thead>
+        <tbody>${emails.map(em => `
+          <tr>
+            <td>${em.first_name || ''} ${em.last_name || ''}</td>
+            <td>${em.value}</td>
+            <td class="text-muted">${em.position || '—'}</td>
+            <td><div class="confidence"><div class="confidence-bar" style="width:${em.confidence}%"></div></div> ${em.confidence}%</td>
+            <td><button class="btn btn-primary btn-sm" onclick="addEmailLead('${em.value}','${em.first_name||''}','${em.last_name||''}','${company||domain}','${domain}')">+ Add Lead</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>`;
+  } catch(e) {
+    container.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+}
+
+function addEmailLead(email, first, last, company, domain) {
+  const niche = document.getElementById('search-niche').value || 'hvac';
+  const city = document.getElementById('search-city').value || 'Dallas';
+  if (state.leads.find(l => l.email === email)) { showToast('Lead already in pipeline', 'error'); return; }
+  state.leads.push({ id: Date.now() + Math.random(), firstName: first, lastName: last, email, company, domain, niche, city, status: 'new', addedAt: new Date().toLocaleDateString() });
+  save();
+  showToast(`${first} ${last} added to pipeline`, 'success');
+  logActivity(`Added ${first} ${last} (${company}) to pipeline`);
+}
+
+function addCompanyToLeads(idx, niche, city) {
+  const c = state.searchResults[idx];
+  if (!c) return;
+  // Add as placeholder lead if no email yet
+  const lead = { id: Date.now() + Math.random(), firstName: '', lastName: '', email: '', company: c.organization || c.name || c.domain, domain: c.domain, niche, city, status: 'new', addedAt: new Date().toLocaleDateString() };
+  state.leads.push(lead);
+  save();
+  showToast(`${lead.company} added — use Get Emails to find contacts`, 'success');
+  // Auto-fetch emails if domain available
+  if (c.domain) fetchDomainEmails(c.domain, lead.company, niche, city);
+}
+
+function addAllToLeads() {
+  const niche = document.getElementById('search-niche').value;
+  const city = document.getElementById('search-city').value;
+  let added = 0;
+  state.searchResults.forEach((c, i) => {
+    if (!state.leads.find(l => l.domain === c.domain)) {
+      state.leads.push({ id: Date.now() + Math.random() + i, firstName: '', lastName: '', email: '', company: c.organization || c.name || c.domain, domain: c.domain, niche, city, status: 'new', addedAt: new Date().toLocaleDateString() });
+      added++;
+    }
+  });
+  save();
+  showToast(`${added} companies added to pipeline`, 'success');
+  logActivity(`Bulk added ${added} companies from search`);
+}
+
+// ─── PIPELINE ─────────────────────────────────────────────────────────────────
+function renderKanban() {
+  const cols = ['new','email1','email2','email3','replied','call','closed','dead'];
+  const board = document.getElementById('kanban-board');
+  board.innerHTML = cols.map(status => {
+    const leads = state.leads.filter(l => l.status === status);
+    const cfg = STATUSES[status];
+    return `<div class="kanban-col">
+      <div class="kanban-col-header" style="color:var(--${status==='new'?'blue':status==='replied'||status==='closed'?'green':status==='dead'?'muted':'purple'})">
+        ${cfg.col} <span class="kanban-count">${leads.length}</span>
+      </div>
+      ${leads.map(l => `<div class="kanban-card" onclick="openEmailDraft(${JSON.stringify(l).replace(/"/g,'&quot;')})">
+        <div class="company">${l.company || '—'}</div>
+        <div class="contact text-sm">${l.firstName} ${l.lastName}</div>
+        ${l.email ? `<div class="contact text-sm" style="margin-top:2px">${l.email}</div>` : ''}
+      </div>`).join('') || '<div style="color:var(--muted);font-size:12px;padding:4px 0">Empty</div>'}
+    </div>`;
+  }).join('');
+}
+
+// ─── EMAIL TEMPLATES PAGE ─────────────────────────────────────────────────────
+let currentEmailTab = 'hvac';
+function switchEmailTab(tab, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  currentEmailTab = tab;
+  renderEmailTemplates(tab);
+}
+
+function renderEmailTemplates(tab) {
+  const container = document.getElementById('email-content');
+  const demoLead = { firstName: '[Name]', company: '[Company]', city: '[City]' };
+  const s = state.settings;
+
+  if (tab === 'linkedin') {
+    container.innerHTML = `
+      <div class="grid-2">
+        <div>
+          <div class="section-title mb-16">🏢 HVAC LinkedIn Messages</div>
+          ${['connect','followup','last'].map((k,i) => `
+            <div class="card card-sm mb-16">
+              <div class="flex-gap mb-8">
+                <strong>Message ${i+1}: ${k==='connect'?'Connection Request':k==='followup'?'After Connect':'Last Touch'}</strong>
+                <button class="btn btn-secondary btn-sm" onclick="copyText(this.nextElementSibling.textContent)">📋 Copy</button>
+              </div>
+              <div class="email-preview" style="font-size:12px">${LINKEDIN_TEMPLATES.hvac[k](demoLead)}</div>
+            </div>`).join('')}
+        </div>
+        <div>
+          <div class="section-title mb-16">🏠 Roofing LinkedIn Messages</div>
+          ${['connect','followup','last'].map((k,i) => `
+            <div class="card card-sm mb-16">
+              <div class="flex-gap mb-8">
+                <strong>Message ${i+1}: ${k==='connect'?'Connection Request':k==='followup'?'After Connect':'Last Touch'}</strong>
+                <button class="btn btn-secondary btn-sm" onclick="copyText(this.nextElementSibling.textContent)">📋 Copy</button>
+              </div>
+              <div class="email-preview" style="font-size:12px">${LINKEDIN_TEMPLATES.roofing[k](demoLead)}</div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+    return;
+  }
+
+  const tmpl = TEMPLATES[tab];
+  const nicheLabel = tab === 'hvac' ? '🏢 HVAC' : '🏠 Roofing';
+  container.innerHTML = ['email1','email2','email3'].map((key, i) => `
+    <div class="card mb-16">
+      <div class="flex-gap mb-16">
+        <strong>${nicheLabel} — Email ${i+1} (Day ${[0,3,7][i]})</strong>
+        <span class="badge ${['badge-email1','badge-email2','badge-email3'][i]}">${['Initial','Follow-Up','Last Touch'][i]}</span>
+        <button class="btn btn-secondary btn-sm" onclick="copyTemplateEmail('${tab}','${key}')">📋 Copy Email</button>
+      </div>
+      <div class="email-field">
+        <label>SUBJECT</label>
+        <div class="email-preview" style="min-height:auto;padding:8px 12px">${tmpl[key].subject}</div>
+      </div>
+      <div class="email-field" style="margin-top:10px">
+        <label>BODY</label>
+        <div class="email-preview">${tmpl[key].body(demoLead, s)}</div>
+      </div>
+    </div>`).join('');
+}
+
+function copyTemplateEmail(niche, key) {
+  const s = state.settings;
+  const demoLead = { firstName: '[Name]', company: '[Company]', city: '[City]' };
+  const tmpl = TEMPLATES[niche][key];
+  const text = `Subject: ${tmpl.subject}\n\n${tmpl.body(demoLead, s)}`;
+  navigator.clipboard.writeText(text).then(() => showToast('Email copied to clipboard!', 'success'));
+}
+
+// ─── LEADS TABLE ─────────────────────────────────────────────────────────────
+function renderLeadsTable() {
+  const q = (document.getElementById('leads-search')?.value || '').toLowerCase();
+  const filterNiche = document.getElementById('leads-filter-niche')?.value || '';
+  const filterStatus = document.getElementById('leads-filter-status')?.value || '';
+
+  let leads = state.leads.filter(l => {
+    if (filterNiche && l.niche !== filterNiche) return false;
+    if (filterStatus && l.status !== filterStatus) return false;
+    if (q && !`${l.firstName} ${l.lastName} ${l.company} ${l.email}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const tbody = document.getElementById('leads-table-body');
+  const empty = document.getElementById('leads-empty');
+
+  if (!leads.length) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  tbody.innerHTML = leads.map(l => {
+    const cfg = STATUSES[l.status] || STATUSES.new;
+    return `<tr>
+      <td>${l.firstName} ${l.lastName}</td>
+      <td><strong>${l.company || '—'}</strong></td>
+      <td style="font-size:12px">${l.email || '<span style="color:var(--muted)">No email</span>'}</td>
+      <td><span class="badge ${l.niche==='hvac'?'badge-hvac':'badge-roofing'}">${l.niche?.toUpperCase()}</span></td>
+      <td><span class="badge ${cfg.badge}">${cfg.label}</span></td>
+      <td class="text-muted text-sm">${l.city || '—'}</td>
+      <td class="text-muted text-sm">${l.addedAt || '—'}</td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap">
+        ${l.email ? `<button class="btn btn-primary btn-sm" onclick="openEmailDraft(${JSON.stringify(l).replace(/"/g,'&quot;')})">✉ Draft</button>` : ''}
+        <select class="btn btn-secondary btn-sm" style="padding:4px 6px" onchange="updateLeadStatus('${l.id}',this.value)">
+          ${Object.entries(STATUSES).map(([k,v]) => `<option value="${k}" ${l.status===k?'selected':''}>${v.label}</option>`).join('')}
+        </select>
+        <button class="btn btn-danger btn-sm" onclick="deleteLead('${l.id}')">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function updateLeadStatus(id, status) {
+  const lead = state.leads.find(l => String(l.id) === String(id));
+  if (lead) { lead.status = status; save(); renderLeadsTable(); renderKanban(); renderDashboard(); logActivity(`Updated ${lead.company} → ${STATUSES[status]?.label}`); }
+}
+
+function deleteLead(id) {
+  state.leads = state.leads.filter(l => String(l.id) !== String(id));
+  save(); renderLeadsTable(); renderKanban(); renderDashboard();
+}
+
+// ─── EMAIL DRAFT MODAL ────────────────────────────────────────────────────────
+function openEmailDraft(lead) {
+  if (typeof lead === 'string') lead = JSON.parse(lead);
+  state.currentEmailLead = lead;
+
+  // Determine which email to draft based on status
+  const emailMap = { new: 'email1', email1: 'email2', email2: 'email3', email3: 'email3' };
+  const emailKey = emailMap[lead.status] || 'email1';
+  state.currentEmailType = emailKey;
+
+  const niche = lead.niche || 'hvac';
+  const tmpl = TEMPLATES[niche]?.[emailKey];
+  if (!tmpl) { showToast('No template for this niche/status', 'error'); return; }
+
+  const s = state.settings;
+  document.getElementById('modal-title').textContent = `Draft Email — ${lead.company || lead.email}`;
+  document.getElementById('modal-to').value = lead.email || '';
+  document.getElementById('modal-subject').value = tmpl.subject;
+  document.getElementById('modal-body-text').value = tmpl.body(lead, s);
+
+  document.getElementById('email-modal').classList.add('open');
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function copyEmail() {
+  const subj = document.getElementById('modal-subject').value;
+  const body = document.getElementById('modal-body-text').value;
+  navigator.clipboard.writeText(`Subject: ${subj}\n\n${body}`).then(() => showToast('Email copied!', 'success'));
+}
+
+function openMailto() {
+  const to = document.getElementById('modal-to').value;
+  const subj = encodeURIComponent(document.getElementById('modal-subject').value);
+  const body = encodeURIComponent(document.getElementById('modal-body-text').value);
+  window.location.href = `mailto:${to}?subject=${subj}&body=${body}`;
+}
+
+function markEmailSent() {
+  const lead = state.currentEmailLead;
+  if (!lead) return;
+  const nextStatus = { email1: 'email1', email2: 'email2', email3: 'email3' };
+  const emailType = state.currentEmailType;
+  const l = state.leads.find(ld => String(ld.id) === String(lead.id));
+  if (l) {
+    l.status = emailType;
+    save();
+    logActivity(`Email sent to ${lead.firstName} ${lead.lastName} at ${lead.company} (${emailType})`);
+    showToast('Marked as sent ✓', 'success');
+    closeModal('email-modal');
+    renderDashboard(); renderLeadsTable(); renderKanban();
+  }
+}
+
+// ─── ADD LEAD MANUALLY ────────────────────────────────────────────────────────
+function openAddLead() { document.getElementById('add-lead-modal').classList.add('open'); }
+function saveManualLead() {
+  const lead = {
+    id: Date.now() + Math.random(),
+    firstName: document.getElementById('al-first').value,
+    lastName: document.getElementById('al-last').value,
+    company: document.getElementById('al-company').value,
+    niche: document.getElementById('al-niche').value,
+    email: document.getElementById('al-email').value,
+    city: document.getElementById('al-city').value || 'Dallas',
+    status: 'new',
+    addedAt: new Date().toLocaleDateString()
+  };
+  if (!lead.company) { showToast('Company name required', 'error'); return; }
+  state.leads.push(lead);
+  save();
+  closeModal('add-lead-modal');
+  showToast(`${lead.firstName} ${lead.lastName} added!`, 'success');
+  logActivity(`Manually added ${lead.company}`);
+  renderLeadsTable(); renderDashboard();
+}
+
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
+function renderDashboard() {
+  const total = state.leads.length;
+  const sent = state.leads.filter(l => ['email1','email2','email3','replied','call','closed'].includes(l.status)).length;
+  const replied = state.leads.filter(l => ['replied','call','closed'].includes(l.status)).length;
+  const calls = state.leads.filter(l => ['call','closed'].includes(l.status)).length;
+  const replyRate = sent > 0 ? Math.round(replied/sent*100) : 0;
+
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-sent').textContent = sent;
+  document.getElementById('stat-replied').textContent = replied;
+  document.getElementById('stat-calls').textContent = calls;
+  document.getElementById('stat-reply-rate').textContent = replyRate + '% reply rate';
+
+  // Math
+  document.getElementById('math-sent').textContent = sent;
+  document.getElementById('math-replies').textContent = `${Math.floor(sent*.05)}–${Math.floor(sent*.10)}`;
+  document.getElementById('math-calls').textContent = `${Math.floor(sent*.025)}–${Math.floor(sent*.05)}`;
+  document.getElementById('math-clients').textContent = `${Math.floor(sent*.01)}–${Math.floor(sent*.02)}`;
+  const low = Math.floor(sent*.01)*5000, high = Math.floor(sent*.02)*15000;
+  document.getElementById('math-revenue').textContent = `$${low.toLocaleString()}–$${high.toLocaleString()}`;
+
+  // Weekly actions
+  const needsEmail1 = state.leads.filter(l => l.status === 'new' && l.email).length;
+  const needsEmail2 = state.leads.filter(l => l.status === 'email1').length;
+  const needsEmail3 = state.leads.filter(l => l.status === 'email2').length;
+  const needsMoreLeads = total < 25;
+
+  document.getElementById('weekly-actions').innerHTML = `
+    ${needsMoreLeads ? `<div style="padding:8px 0;border-bottom:1px solid var(--border);color:var(--orange)">⚠️ Find more leads — you have ${total}/25 target contacts</div>` : ''}
+    ${needsEmail1 ? `<div style="padding:8px 0;border-bottom:1px solid var(--border)">📧 Send Email 1 to <strong style="color:var(--blue)">${needsEmail1} new leads</strong></div>` : ''}
+    ${needsEmail2 ? `<div style="padding:8px 0;border-bottom:1px solid var(--border)">📧 Send Email 2 follow-up to <strong style="color:var(--purple)">${needsEmail2} contacts</strong></div>` : ''}
+    ${needsEmail3 ? `<div style="padding:8px 0;border-bottom:1px solid var(--border)">📧 Send final Email 3 to <strong style="color:var(--orange)">${needsEmail3} contacts</strong></div>` : ''}
+    ${!needsEmail1 && !needsEmail2 && !needsEmail3 && !needsMoreLeads ? '<div style="color:var(--green);padding:8px 0">✅ All caught up! Keep adding leads.</div>' : ''}
+  ` || '<div style="color:var(--muted)">Add leads to see action items</div>';
+
+  // Recent activity
+  const activityEl = document.getElementById('recent-activity');
+  if (!state.activity.length) {
+    activityEl.innerHTML = '<div class="empty">No activity yet. Start by finding leads!</div>';
+    return;
+  }
+  activityEl.innerHTML = state.activity.slice(0,10).map(a => `
+    <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;display:flex;justify-content:space-between">
+      <span>${a.text}</span>
+      <span style="color:var(--muted);font-size:11px">${a.time}</span>
+    </div>`).join('');
+}
+
+// ─── SETTINGS ─────────────────────────────────────────────────────────────────
+function loadSettings() {
+  document.getElementById('settings-api-key').value = state.settings.apiKey || HUNTER_API_KEY;
+  document.getElementById('settings-name').value = state.settings.name || '';
+  document.getElementById('settings-email').value = state.settings.email || '';
+  document.getElementById('settings-calendar').value = state.settings.calendar || '';
+}
+function saveSettings() {
+  state.settings.apiKey = document.getElementById('settings-api-key').value.trim() || HUNTER_API_KEY;
+  save();
+  document.getElementById('settings-status').innerHTML = '<span class="spinner"></span> Testing connection...';
+  checkApiStatus().then(() => {
+    document.getElementById('settings-status').textContent = 'Connected ✓';
+    document.getElementById('settings-status').style.color = 'var(--green)';
+    showToast('Settings saved!', 'success');
+  }).catch(() => {
+    document.getElementById('settings-status').textContent = 'Connection failed — check API key';
+    document.getElementById('settings-status').style.color = 'var(--red)';
+  });
+}
+function saveUserInfo() {
+  state.settings.name = document.getElementById('settings-name').value;
+  state.settings.email = document.getElementById('settings-email').value;
+  state.settings.calendar = document.getElementById('settings-calendar').value;
+  save();
+  showToast('Info saved — templates updated', 'success');
+}
+function clearAllLeads() {
+  if (!confirm('Delete all leads? This cannot be undone.')) return;
+  state.leads = [];
+  save();
+  showToast('All leads cleared', 'success');
+  renderLeadsTable(); renderDashboard(); renderKanban();
+}
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast show ${type}`;
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => showToast('Copied!', 'success'));
+}
+
+function logActivity(text) {
+  state.activity.unshift({ text, time: new Date().toLocaleTimeString() });
+  if (state.activity.length > 50) state.activity.pop();
+  save();
+}
+
+function exportCSV() {
+  if (!state.leads.length) { showToast('No leads to export', 'error'); return; }
+  const headers = ['First Name','Last Name','Company','Email','Niche','Status','City','Added'];
+  const rows = state.leads.map(l => [l.firstName,l.lastName,l.company,l.email,l.niche,l.status,l.city,l.addedAt].map(v => `"${(v||'').replace(/"/g,'""')}"`));
+  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'dfw_leads.csv'; a.click();
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+load();
+renderDashboard();
+checkApiStatus();
+</script>
+</body>
+</html>
