@@ -715,34 +715,13 @@ const STATUSES = {
 // ─── HUNTER.IO API ────────────────────────────────────────────────────────────
 async function hunterRequest(endpoint, params = {}) {
   const key = state.settings.apiKey || HUNTER_API_KEY;
-
-  // For GET endpoints (account, domain-search, email-finder, email-verifier)
-  // Hunter supports direct browser requests. For POST (discover) we need a proxy.
-  const isPost = endpoint === 'discover';
-
-  if (isPost) {
-    // Use corsproxy.io — reliable, no setup needed
-    const proxyUrl = `https://corsproxy.io/?https://api.hunter.io/v2/${endpoint}?api_key=${key}`;
-    const body = {};
-    // Parse flat params back into nested body for discover
-    Object.entries(params).forEach(([k, v]) => {
-      // Pass all params as query string for simplicity
-      body[k] = v;
-    });
-    const qUrl = `https://corsproxy.io/?${encodeURIComponent(`https://api.hunter.io/v2/${endpoint}?api_key=${key}&` + Object.entries(params).map(([k,v])=>`${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&'))}`;
-    const res = await fetch(qUrl);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const text = await res.text();
-    try { return JSON.parse(text); } catch(e) { throw new Error('Invalid response — check API key'); }
-  } else {
-    // Direct fetch — Hunter allows CORS on GET endpoints
-    const url = new URL(`https://api.hunter.io/v2/${endpoint}`);
-    url.searchParams.set('api_key', key);
-    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-    const res = await fetch(url.toString());
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  }
+  // Build URL — Hunter's API supports CORS on all GET endpoints natively
+  const url = new URL(`https://api.hunter.io/v2/${endpoint}`);
+  url.searchParams.set('api_key', key);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  const res = await fetch(url.toString(), { method: 'GET', headers: { 'Accept': 'application/json' } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
 }
 
 async function checkApiStatus() {
@@ -758,53 +737,72 @@ async function checkApiStatus() {
   }
 }
 
-const NICHE_QUERIES = {
-  hvac: 'HVAC heating air conditioning service contractor',
-  roofing: 'roofing contractor roofing company',
-  both: 'HVAC roofing contractor'
+// DFW HVAC & Roofing domains to search — real companies in Dallas-Fort Worth
+const DFW_DOMAINS = {
+  hvac: [
+    'tdindustries.com','airplustx.com','lonestarair.com','metroplexhvac.com',
+    'dallasmechanical.com','airconditioningdallas.com','tempco.com','airtron.com',
+    'abchome.com','onehourheat.com','ballardnatural.com','gillsac.com',
+    'dallasmechanical.net','airexperts.com','comfortexperts.com','txairtech.com',
+    'dallasairrepair.com','dfwhvacpro.com','metroplexac.com','texasairpros.com'
+  ],
+  roofing: [
+    'davidsons-roofing.com','abcroofingtx.com','dallaseliteroofing.com',
+    'dfwroofingpro.com','texasroofingco.com','metroplexroofing.com',
+    'dallasroofingcontractors.com','fortworthroofing.com','arlingtonroofing.com',
+    'trustedroofingdfw.com','roofingdallas.com','superiorroofingtx.com',
+    'lonestarroofing.com','dfwroofers.com','texasroofers.com',
+    'premierroofingdfw.com','reliableroofingdfw.com','masterrooferstx.com',
+    'qualityroofingdfw.com','allstateexteriors.com'
+  ]
 };
 
 async function searchHunter() {
   const niche = document.getElementById('search-niche').value;
   const city = document.getElementById('search-city').value;
-  const size = document.getElementById('search-size').value;
   const btn = document.getElementById('search-btn');
   const status = document.getElementById('search-status');
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Searching...';
-  status.textContent = '';
+  status.textContent = 'Querying Hunter.io...';
 
-  try {
-    const query = `${NICHE_QUERIES[niche]} in ${city}, Texas`;
-    const data = await hunterRequest('discover', {
-      query,
-      'headquarters_location[include][0][city]': city,
-      'headquarters_location[include][0][country]': 'US',
-      'headquarters_location[include][0][state]': 'TX',
-      [`headcount[0]`]: size,
-      limit: 50
-    });
+  const domains = niche === 'both'
+    ? [...DFW_DOMAINS.hvac.slice(0,10), ...DFW_DOMAINS.roofing.slice(0,10)]
+    : DFW_DOMAINS[niche] || DFW_DOMAINS.hvac;
 
-    const companies = data.data || [];
-    state.searchResults = companies;
-    renderSearchResults(companies, niche, city);
-    status.textContent = `Found ${companies.length} companies`;
-    document.getElementById('search-results-card').style.display = 'block';
-    logActivity(`Searched Hunter.io: "${query}" — ${companies.length} results`);
-  } catch(e) {
-    // Fallback: try simpler query
+  const results = [];
+  let searched = 0;
+
+  // Search first 8 domains to stay within API limits
+  for (const domain of domains.slice(0, 8)) {
     try {
-      const data2 = await hunterRequest('discover', { query: NICHE_QUERIES[niche] + ' Texas', limit: 20 });
-      const companies = data2.data || [];
-      state.searchResults = companies;
-      renderSearchResults(companies, niche, city);
-      status.textContent = `Found ${companies.length} companies (broad search)`;
-      document.getElementById('search-results-card').style.display = 'block';
-    } catch(e2) {
-      status.textContent = `Error: ${e2.message}. Check your API key in Settings.`;
-      showToast('Search failed — check API key in Settings', 'error');
-    }
+      status.textContent = `Checking ${domain}... (${searched+1}/8)`;
+      const data = await hunterRequest('email-count', { domain });
+      const count = data.data?.total || 0;
+      if (count > 0) {
+        results.push({
+          domain,
+          organization: domain.replace(/\.(com|net|org|io)$/,'').replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()),
+          emails_count: { total: count, personal: data.data?.personal_emails || 0 },
+          location: city + ', TX',
+          niche: niche === 'both' ? (DFW_DOMAINS.hvac.includes(domain) ? 'hvac' : 'roofing') : niche
+        });
+      }
+      searched++;
+    } catch(e) { searched++; }
+  }
+
+  state.searchResults = results;
+
+  if (results.length) {
+    renderSearchResults(results, niche, city);
+    status.textContent = `Found ${results.length} companies with emails`;
+    document.getElementById('search-results-card').style.display = 'block';
+    logActivity(`Hunter search (${niche}, ${city}): ${results.length} results`);
+  } else {
+    status.textContent = 'No results — try the domain search below to find specific companies';
+    showToast('Use the domain search below to find emails for specific companies', '');
   }
 
   btn.disabled = false;
