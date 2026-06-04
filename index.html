@@ -715,15 +715,34 @@ const STATUSES = {
 // ─── HUNTER.IO API ────────────────────────────────────────────────────────────
 async function hunterRequest(endpoint, params = {}) {
   const key = state.settings.apiKey || HUNTER_API_KEY;
-  const url = new URL(`https://api.hunter.io/v2/${endpoint}`);
-  url.searchParams.set('api_key', key);
-  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  // Use allorigins proxy to avoid CORS on GitHub Pages
-  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url.toString())}`;
-  const res = await fetch(proxyUrl);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const wrapper = await res.json();
-  return JSON.parse(wrapper.contents);
+
+  // For GET endpoints (account, domain-search, email-finder, email-verifier)
+  // Hunter supports direct browser requests. For POST (discover) we need a proxy.
+  const isPost = endpoint === 'discover';
+
+  if (isPost) {
+    // Use corsproxy.io — reliable, no setup needed
+    const proxyUrl = `https://corsproxy.io/?https://api.hunter.io/v2/${endpoint}?api_key=${key}`;
+    const body = {};
+    // Parse flat params back into nested body for discover
+    Object.entries(params).forEach(([k, v]) => {
+      // Pass all params as query string for simplicity
+      body[k] = v;
+    });
+    const qUrl = `https://corsproxy.io/?${encodeURIComponent(`https://api.hunter.io/v2/${endpoint}?api_key=${key}&` + Object.entries(params).map(([k,v])=>`${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&'))}`;
+    const res = await fetch(qUrl);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    try { return JSON.parse(text); } catch(e) { throw new Error('Invalid response — check API key'); }
+  } else {
+    // Direct fetch — Hunter allows CORS on GET endpoints
+    const url = new URL(`https://api.hunter.io/v2/${endpoint}`);
+    url.searchParams.set('api_key', key);
+    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+    const res = await fetch(url.toString());
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
 }
 
 async function checkApiStatus() {
